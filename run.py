@@ -1,6 +1,6 @@
 import yaml
 import argparse
-from fedora import Set, Record
+from app.fedora import Set, Record
 
 
 def choose_operation(choice, instance, ds=None, predicate=None, xpath=None):
@@ -8,11 +8,15 @@ def choose_operation(choice, instance, ds=None, predicate=None, xpath=None):
         instance.grab_images(ds)
     elif choice == "update_gsearch":
         instance.update_gsearch()
+    elif choice == "update_gsearch_no_pages":
+        memberships = instance.find_rels_ext_relationship("isMemberOf")
+        for pid in memberships:
+            instance.results.remove(pid["pid"])
+        instance.update_gsearch()
     elif choice == "grab_foxml":
         instance.grab_foxml()
     elif choice == "harvest_metadata":
         instance.harvest_metadata(ds)
-        print(f"\n\nDownloaded {len(instance.results)} {ds} records.")
     elif choice == "find_missing":
         instance.mark_as_missing(ds)
     elif choice == "list_dsids":
@@ -21,6 +25,15 @@ def choose_operation(choice, instance, ds=None, predicate=None, xpath=None):
         instance.get_relationships()
     elif choice == "grab_other":
         instance.grab_other(ds)
+    elif choice == "find_content_type":
+        instance.find_content_types()
+    elif choice == "write_results":
+        instance.write_results_to_file()
+    elif choice == "test_obj_mimes":
+        x = instance.check_obj_mime_types()
+        print("\nHere are the unique mime types in your result set:")
+        for k, v in x.items():
+            print(f"\tThere are {v} OBJs that are {k}.")
     elif choice == "find_matching_relationship":
         memberships = instance.find_rels_ext_relationship(predicate)
         print(memberships)
@@ -43,7 +56,6 @@ def choose_operation(choice, instance, ds=None, predicate=None, xpath=None):
         for pid in memberships:
             instance.results.remove(pid["pid"])
         instance.harvest_metadata(ds)
-        print(f"\n\nDownloaded {len(instance.results)} {ds} records.")
     elif choice == "find_bad_books":
         # Set some variables
         if predicate is None:
@@ -77,9 +89,17 @@ def choose_operation(choice, instance, ds=None, predicate=None, xpath=None):
             print(f"{book_total}. {i}")
             book_total += 1
     elif choice == "count_objects":
-        print(instance.count_objects())
+        print(f"\n\nTotal matching documents: {instance.count_objects()}")
+    elif choice == "test_embargos":
+        instance.test_embargos()
+    elif choice == "purge_old_dsids":
+        if ds is not None:
+            instance.purge_all_but_newest_dsid(ds)
+        else:
+            print("\n\nYou need to define a datastream to purge.")
     else:
         print("No valid operator.")
+    return
 
 
 def review_memberships(item, membership_list, rel):
@@ -98,7 +118,8 @@ def main():
                                                                     "grab_other, update_gsearch, find_missing, "
                                                                     "get_relationships, find_bad_books, update_labels, "
                                                                     "harvest_metadata_no_pages, grab_foxml, "
-                                                                    "count_objects",
+                                                                    "count_objects, update_gsearch_no_pages, "
+                                                                    "purge_old_dsids, write_results",
                         required=True)
     parser.add_argument("-r", "--relationship", dest="relationship", help="Specify the relationship to check for.")
     parser.add_argument("-xp", "--xpath", dest="xpath", help="Specify an xpath value to find. Used in update_label.")
@@ -131,6 +152,7 @@ def main():
     while my_records.token is not None:
         my_records.populate()
     choose_operation(operation, my_records, dsid, relationship, my_xpath)
+
 
 if __name__ == "__main__":
     main()
